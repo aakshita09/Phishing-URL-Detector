@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Phishing URL Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef2f6;--sf:#fff;--ink:#14213d;--mut:#5b6679;--line:#d5dce6;--acc:#2457d6;--crit:#b3202f;--high:#d9480f;--med:#a86b00;--low:#2b6cb0;--ok:#237a55;--critbg:#fbe9eb;--highbg:#fdeee4;--medbg:#fcf3dd;--lowbg:#e6eefa;--okbg:#e2f3ea;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1624;--sf:#182133;--ink:#e6ebf5;--mut:#9aa6bd;--line:#2a364d;--acc:#7da2ff;--crit:#ff7a86;--high:#ff9a5c;--med:#f0b84a;--low:#7db4f0;--ok:#5fd0a0;--critbg:#3a1b22;--highbg:#3a2418;--medbg:#392e14;--lowbg:#1a2a44;--okbg:#14332a}}
+:root[data-theme="dark"]{--bg:#0f1624;--sf:#182133;--ink:#e6ebf5;--mut:#9aa6bd;--line:#2a364d;--acc:#7da2ff;--crit:#ff7a86;--high:#ff9a5c;--med:#f0b84a;--low:#7db4f0;--ok:#5fd0a0;--critbg:#3a1b22;--highbg:#3a2418;--medbg:#392e14;--lowbg:#1a2a44;--okbg:#14332a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 "Source Sans 3",system-ui,sans-serif}
+main{max-width:820px;margin:0 auto;padding:28px 18px 60px}
+h1{font:700 clamp(28px,6vw,42px)/1.05 "Bricolage Grotesque",system-ui,sans-serif;margin:0 0 8px;letter-spacing:-.02em}
+h2{font:700 19px/1.2 "Bricolage Grotesque",system-ui,sans-serif;margin:30px 0 12px}
+.sub{color:var(--mut);margin:0 0 22px;max-width:60ch}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+.box{display:flex;gap:8px;flex-wrap:wrap}
+input{flex:1 1 280px;min-width:0;padding:13px 14px;font:400 15px "JetBrains Mono",ui-monospace,monospace;color:var(--ink);background:var(--sf);border:1.5px solid var(--line);border-radius:8px}
+input:focus,button:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+button{font:600 15px "Source Sans 3",sans-serif;cursor:pointer;border-radius:8px;border:1.5px solid var(--acc);background:var(--acc);color:#fff;padding:12px 20px}
+:root[data-theme="dark"] button.go,@media (prefers-color-scheme:dark){}
+button.ghost{background:transparent;color:var(--acc);border-color:var(--line);padding:6px 11px;font-size:13px;font-weight:400}
+.samples{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;color:var(--mut);font-size:13px}
+.note{font-size:13px;color:var(--mut);margin-top:10px}
+#out[hidden]{display:none}
+.verdict{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center;background:var(--sf);border:1.5px solid var(--line);border-left:8px solid var(--c);border-radius:10px;padding:18px;margin-top:24px}
+.score{font:700 54px/1 "Bricolage Grotesque",sans-serif;color:var(--c);min-width:92px;text-align:center}
+.score small{display:block;font:600 13px "Source Sans 3",sans-serif;color:var(--mut)}
+.vt{font:700 22px "Bricolage Grotesque",sans-serif;color:var(--c);margin:0 0 4px}
+.meter{height:8px;border-radius:5px;background:linear-gradient(90deg,var(--ok),var(--med),var(--high),var(--crit));position:relative;margin-top:12px}
+.meter i{position:absolute;top:-4px;width:4px;height:16px;border-radius:2px;background:var(--ink);transform:translateX(-2px);transition:left .5s}
+.lens{background:var(--sf);border:1.5px solid var(--line);border-radius:10px;padding:16px;font:400 15px/2 "JetBrains Mono",monospace;word-break:break-all}
+.lens span{border-bottom:3px solid transparent;padding:1px 0;cursor:help}
+.lens .s-crit{background:var(--critbg);border-color:var(--crit)}.lens .s-high{background:var(--highbg);border-color:var(--high)}.lens .s-med{background:var(--medbg);border-color:var(--med)}.lens .s-low{background:var(--lowbg);border-color:var(--low)}
+.lens .dim{color:var(--mut)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--mut);margin-top:8px}
+.legend b{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+.tw{overflow-x:auto;background:var(--sf);border:1.5px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:14px}
+td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}
+tr:first-child td{border-top:0}
+td:first-child{font-weight:600;white-space:nowrap;width:1%}
+td.v{font-family:"JetBrains Mono",monospace;font-size:13px;word-break:break-all}
+td.n{color:var(--mut)}
+.f{background:var(--sf);border:1.5px solid var(--line);border-left:6px solid var(--c);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.f h3{margin:0 0 3px;font:700 16px "Bricolage Grotesque",sans-serif;display:flex;justify-content:space-between;gap:10px}
+.f h3 em{font:600 12px "Source Sans 3",sans-serif;font-style:normal;color:var(--c);background:var(--bg2);padding:1px 8px;border-radius:20px;white-space:nowrap;align-self:flex-start}
+.f p{margin:0;color:var(--mut)}
+.f.crit{--c:var(--crit);--bg2:var(--critbg)}.f.high{--c:var(--high);--bg2:var(--highbg)}.f.med{--c:var(--med);--bg2:var(--medbg)}.f.low{--c:var(--low);--bg2:var(--lowbg)}
+details{background:var(--sf);border:1.5px solid var(--line);border-radius:10px;padding:10px 14px}
+summary{cursor:pointer;font-weight:600;color:var(--ok)}
+details ul{margin:10px 0 0;padding-left:20px;color:var(--mut)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:22px}
+@media (max-width:520px){.verdict{grid-template-columns:1fr}.score{text-align:left}}
+@media (prefers-reduced-motion:reduce){.meter i{transition:none}}
+/* ---- v2 look: sage paper, ink type, stamp verdict, ruler scale ---- */
+:root{--ui:"Schibsted Grotesk",system-ui,sans-serif;color-scheme:dark;--bg:#000;--sf:#111;--ink:#ecece9;--mut:#9a9a96;--line:#2b2b2b;--acc:#5ccfb0;--crit:#ff8077;--high:#ffa064;--med:#e8bf4a;--low:#86b6ea;--ok:#6ad59d;--critbg:#3c1e1b;--highbg:#3b2616;--medbg:#383015;--lowbg:#1b2c42;--okbg:#173326}
+html,body{background:#000}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#000;--sf:#111;--ink:#ecece9;--mut:#9a9a96;--line:#2b2b2b;--acc:#5ccfb0;--crit:#ff8077;--high:#ffa064;--med:#e8bf4a;--low:#86b6ea;--ok:#6ad59d;--critbg:#3c1e1b;--highbg:#3b2616;--medbg:#383015;--lowbg:#1b2c42;--okbg:#173326}}
+:root[data-theme="dark"]{--bg:#000;--sf:#111;--ink:#ecece9;--mut:#9a9a96;--line:#2b2b2b;--acc:#5ccfb0;--crit:#ff8077;--high:#ffa064;--med:#e8bf4a;--low:#86b6ea;--ok:#6ad59d;--critbg:#3c1e1b;--highbg:#3b2616;--medbg:#383015;--lowbg:#1b2c42;--okbg:#173326}
+body,button,h1,h2,.vt,.score,.score small,.f h3,.f h3 em{font-family:var(--ui)}
+main{max-width:860px;padding-top:48px}
+h1{font-weight:800;font-size:clamp(40px,9vw,68px);letter-spacing:-.04em;line-height:.95;margin-bottom:14px}
+h2{font-size:21px;font-weight:700;margin:44px 0 14px;letter-spacing:-.01em}
+.sub{font-size:18px;color:var(--ink);opacity:.8}
+input{border:2px solid var(--ink);border-radius:4px;padding:15px 16px;font-size:15px}
+button{background:var(--ink);border-color:var(--ink);color:var(--bg);border-radius:4px;font-weight:700;padding:14px 24px}
+.samples{font-size:14px}
+.samples button.ghost{border:0;background:none;padding:0;color:var(--acc);font-size:14px;font-weight:500;text-decoration:underline;text-underline-offset:3px}
+.row button.ghost{border:2px solid var(--ink);color:var(--ink);padding:9px 16px;font-weight:700;font-size:14px}
+.verdict{background:transparent;border:0;border-top:3px solid var(--ink);border-radius:0;padding:26px 0 8px;gap:26px;margin-top:32px}
+.score{border:4px double var(--c);border-radius:8px;padding:12px 18px 10px;transform:rotate(-3deg);font-size:50px;font-weight:800;letter-spacing:-.04em;min-width:0;background:transparent}
+.score small{font-size:12px;font-weight:700;letter-spacing:0}
+.vt{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.meter{height:16px;border-radius:0;background:repeating-linear-gradient(90deg,var(--ink) 0 1px,transparent 1px 5%) bottom/100% 8px no-repeat,linear-gradient(var(--ink),var(--ink)) bottom/100% 1px no-repeat;margin-top:16px}
+.meter i{top:-3px;height:19px;width:6px;transform:translateX(-3px);background:var(--c);border-radius:1px}
+.lens{border:0;border-radius:6px;padding:20px 18px 24px;line-height:3.3;font-size:15px}
+.lens span{border-radius:3px;border-bottom-width:2px}
+.lens span[data-l]{position:relative}
+.lens span[data-l]::after{content:attr(data-l);position:absolute;left:0;top:100%;margin-top:-6px;font:500 10px/1 var(--ui);color:var(--mut);white-space:nowrap}
+.tw{border:0;border-radius:6px}
+td:first-child{font-weight:700}
+.f{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;padding:16px 0 16px 28px;margin:0;position:relative}
+.f:last-child{border-bottom:1px solid var(--line)}
+.f::before{content:"";position:absolute;left:4px;top:23px;width:11px;height:11px;background:var(--c);transform:rotate(45deg)}
+.f h3{font-size:17px;font-weight:700}
+.f h3 em{background:none;padding:0;font-weight:800;font-size:13px}
+.f p{margin-top:2px}
+details{border:0;border-radius:6px;margin-top:14px}
+.rc{background:var(--sf);border-radius:6px;padding:6px 22px 18px}
+.rc h4{margin:20px 0 6px;font:800 16px/1.2 var(--ui);color:var(--acc)}
+.rc ol,.rc ul{margin:0;padding-left:22px}
+.rc li{margin:6px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Phishing URL Detector</h1>
+<p class="sub">Paste a link and see <em>why</em> it looks safe or suspicious: every red flag is explained and highlighted in the URL itself.</p>
+<div class="box">
+<input id="u" type="text" placeholder="https://secure-login.paypa1-verify.xyz/account/update" autocomplete="off" spellcheck="false" aria-label="URL to analyze">
+<button id="go">Analyze link</button>
+</div>
+<div class="samples">Try:
+<button class="ghost" data-s="https://www.github.com/anthropics">legit link</button>
+<button class="ghost" data-s="http://secure-login.paypa1-verify.xyz/account/update?email=you@mail.com">fake PayPal</button>
+<button class="ghost" data-s="http://paypal.com@185.220.101.4/signin">@ trick + IP</button>
+<button class="ghost" data-s="https://xn--pple-43d.com/id/verify">lookalike letters</button>
+<button class="ghost" data-s="http://0x7f000001/%75pdate/login.php?redirect=http://evil.top">hex IP + encoding</button>
+</div>
+<p class="note">Analysis runs entirely in your browser. The link is never opened or sent anywhere, so it is safe to paste suspicious URLs. Heuristics catch common patterns but are not proof either way.</p>
+
+<div id="out" hidden>
+<div class="verdict" id="vd"></div>
+<h2>The URL under the lens</h2>
+<div class="lens" id="lens"></div>
+<div class="legend"><span><b style="background:var(--crit)"></b>critical</span><span><b style="background:var(--high)"></b>high</span><span><b style="background:var(--med)"></b>medium</span><span><b style="background:var(--low)"></b>minor</span><span>Hover a highlight for its reason.</span></div>
+<h2>Structure breakdown</h2>
+<div class="tw"><table id="bk"></table></div>
+<h2>Why it looks suspicious</h2>
+<div id="fl"></div>
+<div id="pass"></div>
+<h2>Security recommendations</h2>
+<div id="rc"></div>
+<div class="row"><button class="ghost" id="cp">Copy report</button></div>
+</div>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const MULTI=new Set(["co.uk","org.uk","ac.uk","gov.uk","com.au","net.au","org.au","co.in","net.in","org.in","co.jp","com.br","com.cn","com.mx","co.nz","co.za","com.sg","com.tr","com.pk","com.ng"]);
+const BAD_TLD=new Set(["xyz","top","tk","ml","ga","cf","gq","click","link","zip","mov","work","support","rest","country","kim","loan","men","review","stream","download","icu","cyou","buzz","monster","cam","sbs","shop","live","vip","online","site","fit","bond"]);
+const SHORT=new Set(["bit.ly","tinyurl.com","t.co","goo.gl","ow.ly","is.gd","buff.ly","rebrand.ly","cutt.ly","shorturl.at","tiny.cc","rb.gy","lnkd.in","t.ly"]);
+const KW=["login","log-in","signin","sign-in","verify","verification","secure","security","account","update","confirm","password","passwd","banking","wallet","billing","invoice","payment","suspend","suspended","unlock","restore","recover","validate","authenticate","alert","urgent","limited","expire","webscr","credential","support","helpdesk","refund","prize","reward","claim"];
+const BRANDS=["paypal","google","gmail","microsoft","outlook","office365","apple","icloud","amazon","facebook","instagram","whatsapp","netflix","linkedin","dropbox","twitter","github","dhl","fedex","usps","chase","wellsfargo","citibank","hsbc","hdfc","icici","sbi","paytm","binance","coinbase","metamask","steam","adobe","docusign","telegram","spotify","ebay","walmart"];
+const BAD_EXT=/\.(exe|scr|apk|msi|bat|cmd|js|jar|vbs|iso|dmg|zip|rar|html?|php)(?=$|[?#])/i;
+
+function lev(a,b){const d=Array.from({length:a.length+1},(_,i)=>[i,...Array(b.length).fill(0)]);for(let j=1;j<=b.length;j++)d[0][j]=j;for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[a.length][b.length]}
+function entropy(s){const m={};for(const c of s)m[c]=(m[c]||0)+1;return -Object.values(m).reduce((t,n)=>t+n/s.length*Math.log2(n/s.length),0)}
+function unleet(s){return s.replace(/rn/g,"m").replace(/vv/g,"w").replace(/0/g,"o").replace(/[1|]/g,"l").replace(/3/g,"e").replace(/5/g,"s").replace(/4/g,"a").replace(/\$/g,"s")}
+function tryDecode(s){try{return decodeURIComponent(s)}catch(e){return s}}
+
+function parse(raw){
+  let s=raw.trim(),assumed=false,special=null;
+  const sp=s.match(/^(javascript|data|vbscript|file):/i);
+  if(sp){special=sp[1].toLowerCase();return{raw:s,special}}
+  if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)){s="http://"+s.replace(/^\/\//,"");assumed=true}
+  const m=s.match(/^([a-z][a-z0-9+.-]*):\/\/([^\/?#]*)([^?#]*)(\?[^#]*)?(#.*)?$/i);
+  if(!m)return null;
+  let auth=m[2],user="",at=auth.lastIndexOf("@");
+  if(at>=0){user=auth.slice(0,at);auth=auth.slice(at+1)}
+  let host=auth,port="";
+  const pm=auth.match(/^(\[[^\]]*\]|[^:]*)(?::(\d*))?$/);
+  if(pm){host=pm[1];port=pm[2]||""}
+  host=host.toLowerCase();
+  const isIP=/^\[.*\]$/.test(host)||/^[\d.]+$/.test(host)||/^0x[0-9a-f.]+$/i.test(host);
+  let ipKind=null;
+  if(/^\[.*\]$/.test(host))ipKind="IPv6";
+  else if(/^\d{1,3}(\.\d{1,3}){3}$/.test(host)){ipKind=host.split(".").some(p=>p.length>1&&p[0]==="0")?"octal":"dotted"}
+  else if(/^\d+$/.test(host))ipKind="decimal";
+  else if(/^0x[0-9a-f]+(\.|$)/i.test(host))ipKind="hex";
+  let sub="",dom=host,tld="";
+  if(!ipKind){
+    const L=host.split(".").filter((x,i,a)=>x||i<a.length-1);
+    const two=L.slice(-2).join(".");
+    const tn=MULTI.has(two)?2:1;
+    tld=L.slice(-tn).join(".");
+    dom=L.length>tn?L[L.length-tn-1]:"";
+    sub=L.slice(0,Math.max(0,L.length-tn-1)).join(".");
+  }
+  return{raw:s,assumed,scheme:m[1].toLowerCase(),user,host,port,sub,dom,tld,ipKind,path:m[3],query:m[4]||"",frag:m[5]||"",hasAt:at>=0,auth:m[2]};
+}
+
+function analyze(p){
+  const F=[],P=[];
+  const add=(sev,seg,title,why)=>F.push({sev,seg,title,why});
+  const ok=t=>P.push(t);
+  if(p.special){add("crit","raw","Dangerous URL scheme: "+p.special+":","This is not a web address. It can run code or embed content directly in your browser, which is a common way to hide malicious payloads in a link.");return{F,P}}
+  const label=p.dom,full=p.host,rest=(p.path+p.query).toLowerCase();
+  // scheme
+  if(p.assumed)add("low","scheme","No scheme given","You did not include http:// or https://, so the analysis assumes plain http. Always check what a real link would use.");
+  else if(p.scheme==="http")add("med","scheme","Uses http instead of https","Traffic is not encrypted and the site has no valid certificate identity. Many phishing pages use http, though plenty now use https, so https alone proves nothing.");
+  else if(p.scheme==="https")ok("Uses https (encrypted, but phishing sites can have it too)");
+  else add("med","scheme","Unusual scheme: "+p.scheme,"Links in emails and messages should almost always be http or https.");
+  // credentials
+  if(p.hasAt){
+    const looksUrl=/[.]|https?/i.test(p.user);
+    add("crit","user",looksUrl?"@ trick: fake domain before the real one":"Credentials embedded in the URL","Everything before the @ is a username, not the destination. The browser actually goes to "+p.host+". Attackers put a trusted-looking domain first to fool a quick glance.");
+  }else ok("No hidden username (@) in the address");
+  // IP
+  if(p.ipKind){
+    const odd=p.ipKind!=="dotted"&&p.ipKind!=="IPv6";
+    add(odd?"crit":"high","host",odd?"Obfuscated IP address ("+p.ipKind+" notation)":"Raw IP address instead of a domain name",(odd?"The IP is written as a "+p.ipKind+" number to hide that it is an IP at all. ":"")+"Legitimate services use domain names. A bare IP means no brand identity, and it is usually a throwaway server.");
+  }else ok("Uses a domain name rather than a raw IP");
+  // punycode / non-ascii
+  if(/[^\x00-\x7f]/.test(p.host)){
+    const scripts=[/[\u0400-\u04ff]/.test(p.host)&&"Cyrillic",/[\u0370-\u03ff]/.test(p.host)&&"Greek"].filter(Boolean);
+    add("crit","host","Non-Latin characters in the domain (homograph attack)","The domain contains characters like "+(scripts.join("/")||"non-ASCII letters")+" that can look identical to Latin letters, such as а vs a. It can display as a trusted brand while being a different domain.");
+  }else if(/(^|\.)xn--/.test(p.host)){
+    let note="";try{note=" Decoded by browsers, it may look like a familiar name.";}catch(e){}
+    add("high","host","Punycode domain (xn--)","This domain uses internationalized characters encoded as ASCII. Attackers use these to imitate brands with lookalike letters."+note);
+  }else if(!p.ipKind)ok("Domain uses plain ASCII letters (no lookalike characters)");
+  // brand checks
+  if(!p.ipKind&&label){
+    const hostAll=p.host+" "+tryDecode(p.path).toLowerCase();
+    const seen=new Set();
+    for(const b of BRANDS){
+      const exact=label===b;
+      if(exact)continue;
+      const inSub=p.sub.split(/[.\-]/).includes(b)||p.sub.includes(b);
+      const inLabel=label.includes(b);
+      const inPath=rest.includes(b);
+      const norm=unleet(label);
+      if(inSub&&!seen.has(b)){seen.add(b);add("crit","sub","Brand name “"+b+"” used as a subdomain","In "+p.host+", the real owner is "+label+"."+p.tld+", not "+b+". Attackers put a famous name on the left so the link seems to belong to it.");}
+      else if(inLabel&&!seen.has(b)){seen.add(b);add("high","dom","Domain contains brand “"+b+"” plus extra text","Real brands rarely use hyphenated or extended domains like “"+label+"” for sign-in. This pattern is typical of lookalike domains.");}
+      else if(norm.includes(b)&&!label.includes(b)&&!seen.has(b)){seen.add(b);add("crit","dom","Look-alike spelling of “"+b+"”","Swapping characters (0 for o, 1 for l, rn for m) makes “"+label+"” read like “"+b+"” at a glance, but it is a different domain.");}
+      else if(label.length>=4&&Math.abs(label.length-b.length)<=2&&lev(label,b)<=2&&label[0]===b[0]&&b.length>=5&&!seen.has(b)){seen.add(b);add("high","dom","Possible typosquat of “"+b+"”","“"+label+"” is only "+lev(label,b)+" character edit(s) from “"+b+"”. Typo domains catch people who mistype or skim.");}
+      else if(inPath&&!seen.has(b)){seen.add(b);add("med","path","Brand “"+b+"” appears in the path, not the domain","Only the domain decides who owns the page. A trusted name after the slash is decoration an attacker can add to any site.");}
+    }
+    if(!seen.size)ok("No well-known brand imitation detected");
+  }
+  // TLD
+  if(p.tld&&BAD_TLD.has(p.tld.split(".").pop()))add("med","tld","Frequently abused top-level domain (.“"+p.tld+"”)","Cheap or free TLDs are heavily used for short-lived phishing campaigns. Not proof alone, but it raises the odds.");
+  else if(p.tld)ok("TLD (.“"+p.tld+"”) is not on the commonly abused list");
+  // subdomains
+  const sc=p.sub?p.sub.split(".").length:0;
+  if(sc>=3)add("high","sub","Excessive subdomains ("+sc+")","Long subdomain chains push the real domain out of view, especially on a phone. Always read from the right, up to the first slash.");
+  else if(sc===2)add("low","sub","Several subdomain levels","Two levels is sometimes legitimate, but check that the part just before the TLD is the brand you expect.");
+  // hyphens, digits, entropy
+  if(label){
+    const hy=(label.match(/-/g)||[]).length;
+    if(hy>=2)add("med","dom","Many hyphens in the domain ("+hy+")","Phishers chain words like “secure-account-verify” to mimic official names. Large brands almost never do this.");
+    if(/\d/.test(label)&&/[a-z]/.test(label)&&(label.match(/\d/g)||[]).length>=3)add("low","dom","Mix of letters and several digits","Auto-generated or throwaway domains often include random digits.");
+    if(label.length>=10&&entropy(label)>3.4&&!/[aeiou]{1}/.test(label.replace(/[^aeiou]/g,"").slice(0,1)))add("low","dom","Domain looks randomly generated","High character randomness is common in algorithmically generated domains.");
+    if(label.length>25)add("low","dom","Very long domain name","Unusually long domain labels are rare for real brands.");
+  }
+  // shortener
+  if(SHORT.has(p.host))add("high","host","URL shortener hides the destination","You cannot tell where this leads. Expand it with a preview service before clicking.");
+  // keywords
+  const kwHost=KW.filter(k=>p.host.includes(k)),kwPath=KW.filter(k=>rest.includes(k)&&!kwHost.includes(k));
+  if(kwHost.length)add(kwHost.length>1?"high":"med","host","Phishing words in the domain: "+kwHost.join(", "),"Words about logging in, verifying or security create urgency and fake legitimacy. Real companies put these on pages of their own domain, not inside a new domain name.");
+  if(kwPath.length)add(kwPath.length>2?"med":"low","path","Phishing words in the path/query: "+kwPath.slice(0,6).join(", "),"Sign-in and verification terms are normal on real sites too, so this matters most when combined with other flags.");
+  if(!kwHost.length&&!kwPath.length)ok("No common phishing keywords found");
+  // port
+  if(p.port&&!["80","443",""].includes(p.port))add("med","port","Non-standard port :"+p.port,"Real consumer sites almost always use the default ports. Custom ports often mean a self-hosted kit.");
+  // encoding
+  const hostEnc=/%[0-9a-f]{2}/i.test(p.auth);
+  if(hostEnc)add("crit","host","Percent-encoding inside the host","Encoding characters in the domain part is meant to dodge filters and disguise the real name.");
+  const encN=(p.path+p.query).match(/%[0-9a-f]{2}/gi)||[];
+  if(/%25[0-9a-f]{2}/i.test(p.path+p.query))add("high","path","Double URL-encoding","Encoding the encoded text (%25xx) is used to slip past security scanners.");
+  const printable=encN.filter(e=>{const c=parseInt(e.slice(1),16);return /[a-z0-9\-._\/]/i.test(String.fromCharCode(c))});
+  if(printable.length>=2)add("high","path","Normal letters hidden with %-encoding ("+printable.length+")","Characters like %75 for “u” need no encoding. Hiding letters this way conceals words from reviewers and filters.");
+  else if(encN.length>=6)add("med","path","Heavy %-encoding ("+encN.length+" sequences)","A lot of escaped characters makes a link unreadable, which is rarely necessary in a legitimate URL.");
+  // embedded URL / redirect
+  if(/(https?:\/\/|https?%3a%2f%2f|\/\/)/i.test(p.query)||/[?&](url|redirect|redir|next|return|goto|dest|target|link)=/i.test(p.query))add("high","query","Redirect or embedded URL in the query","This link may bounce you to another site. Attackers abuse trusted sites’ open redirects to make bad links look good.");
+  if(/\/\/|https?:/i.test(p.path.slice(1)))add("med","path","Second URL inside the path","A full address inside the path can make the link appear to belong to a different site.");
+  // downloads
+  if(BAD_EXT.test(p.path))add("med","path","Points to a downloadable or script file","Phishing kits and malware are often delivered as .php, .html, .zip, .exe or .apk files. Check the file type before opening.");
+  // length
+  const len=p.raw.length;
+  if(len>120)add("med","raw","Very long URL ("+len+" characters)","Long URLs bury the real domain among noise. Look only at the part before the first single slash.");
+  else if(len>75)add("low","raw","Long URL ("+len+" characters)","Longer than most legitimate links, which gives attackers room to hide details.");
+  // fragment
+  if(p.frag&&/(https?:|@|login|verify)/i.test(p.frag))add("low","frag","Suspicious text after #","Anything after # stays in your browser and can be used to display fake addresses or tokens.");
+  return{F,P};
+}
+
+const PTS={crit:30,high:18,med:9,low:4},ORDER=["crit","high","med","low"],NAME={crit:"Critical",high:"High",med:"Medium",low:"Minor"};
+function rate(F){
+  const s=Math.min(100,F.reduce((t,f)=>t+PTS[f.sev],0));
+  if(s>=70)return{s,l:"Critical risk",c:"--crit",t:"Multiple strong phishing signals. Do not open this link or enter any information."};
+  if(s>=40)return{s,l:"High risk",c:"--high",t:"This link has several traits common to phishing. Treat it as hostile unless verified through another channel."};
+  if(s>=15)return{s,l:"Moderate risk",c:"--med",t:"A few suspicious traits. Verify the sender and go to the site by typing its address yourself."};
+  return{s,l:"Low risk",c:"--ok",t:"No strong phishing patterns found. That does not guarantee safety, so stay cautious with unexpected messages."};
+}
+const defang=u=>u.replace(/^http/i,"hxxp").replace(/\./g,"[.]");
+
+function recs(F,p,r){
+  const has=re=>F.some(f=>re.test(f.title));
+  const now=[],ver=[],aft=[],stay=[];
+  if(r.s>=40)now.push("Do not click, open or forward this link. Delete the message or report it as phishing in your email app.","Do not enter passwords, one-time codes, card or bank details on this page, even if it looks perfect.");
+  else if(r.s>=15)now.push("Pause before clicking. Reach the real site by typing its address or using your saved bookmark.");
+  else now.push("Nothing alarming was found, but confirm the sender before you sign in anywhere.");
+  if(has(/Dangerous URL scheme/))now.push("Never paste or run this in your address bar or browser console.");
+  if(has(/@ trick|Credentials embedded/))ver.push("Ignore everything before the @. The real destination is the text after it.");
+  if(has(/IP address/))ver.push("Real services use domain names. Never log in on a page served from a bare IP address.");
+  if(has(/homograph|Punycode|Look-alike|typosquat/))ver.push("Type the brand’s address yourself and compare it letter by letter, or use the official app. Lookalike letters fool the eye.");
+  if(has(/brand|Brand/))ver.push("Find the real owner: it is the name just before the TLD, ahead of the first single slash. Subdomains and paths can say anything.");
+  if(has(/http instead|No scheme/))ver.push("Avoid entering data on http pages. Even with https, a padlock only means encryption, not honesty.");
+  if(has(/shortener/))ver.push("Expand shortened links with a preview or unshortening tool before opening them.");
+  if(has(/Redirect|Second URL|encoding|%-/))ver.push("Encoded and redirecting links can land somewhere other than what is shown. Open links only from sources you trust.");
+  if(has(/downloadable/))ver.push("Do not open or install files from this link. If you already downloaded one, scan it and delete it.");
+  if(has(/Phishing words|abused top-level|Excessive subdomains|hyphens/))ver.push("Treat urgency (suspended, verify now, expires) as a warning sign, not a reason to hurry. Contact the company through its official app, site or phone number.");
+  if(r.s>=15){
+    ver.push("Confirm through another channel: call or message the sender using details you already trust.");
+    ver.push("Cross-check on a reputation service such as VirusTotal or Google Safe Browsing by pasting the link text, never by visiting it.");
+    aft.push("Entered a password: change it now on the real site, and anywhere else you reused it.","Turn on multi-factor authentication and sign out of other sessions.","Entered card or bank details: call your bank or card issuer to block or monitor the card.","Downloaded or installed something: disconnect from the network, run a full antivirus scan and tell your IT team.","Report it to your IT or security team, to the impersonated company, and to your local cybercrime reporting service.");
+  }
+  stay.push("Use a password manager. It will not autofill on a lookalike domain, which is a useful alarm.","Enable multi-factor authentication, ideally passkeys or an authenticator app, on email, banking and social accounts.","Keep your browser and operating system updated and leave built-in phishing protection turned on.");
+  const li=a=>a.map(x=>`<li>${esc(x)}</li>`).join("");
+  let html=`<div class="rc"><h4>Do this now</h4><ol>${li(now)}</ol>`;
+  if(ver.length)html+=`<h4>Verify before you trust it</h4><ul>${li(ver)}</ul>`;
+  if(aft.length)html+=`<h4>If you already clicked or entered anything</h4><ul>${li(aft)}</ul>`;
+  html+=`<h4>Stay protected</h4><ul>${li(stay)}</ul></div>`;
+  return{html,flat:[...now,...ver,...aft,...stay]};
+}
+let report="";
+function run(){
+  const raw=$("#u").value.trim();if(!raw)return;
+  const p=parse(raw);
+  if(!p){alert("That does not look like a URL I can parse. Check for spaces or missing parts.");return}
+  const {F,P}=analyze(p);
+  F.sort((a,b)=>ORDER.indexOf(a.sev)-ORDER.indexOf(b.sev));
+  const r=rate(F);
+  $("#out").hidden=false;
+  $("#vd").style.setProperty("--c","var("+r.c+")");
+  $("#vd").innerHTML=`<div class="score">${r.s}<small>of 100</small></div><div><p class="vt">${r.l}</p><div>${r.t}</div><div class="meter" role="img" aria-label="Risk ${r.s} out of 100"><i style="left:${r.s}%"></i></div></div>`;
+  // lens
+  const sev={};
+  F.forEach(f=>{if(!sev[f.seg]||ORDER.indexOf(f.sev)<ORDER.indexOf(sev[f.seg].sev))sev[f.seg]=f;});
+  const LB={scheme:"scheme",user:"user",sub:"sub",dom:"domain",tld:"tld",host:"host",port:"port",path:"path",query:"query",frag:"frag",raw:"url"};
+  const seg=(k,txt)=>{if(!txt)return"";const f=sev[k]||(["sub","dom","tld"].includes(k)?sev.host:null)||sev.raw;const a=`data-l="${LB[k]}"`;return f?`<span ${a} class="s-${f.sev}" title="${esc(NAME[f.sev]+": "+f.title)}">${esc(txt)}</span>`:`<span ${a}>${esc(txt)}</span>`};
+  let h="";
+  if(p.special)h=seg("raw",p.raw);
+  else{
+    h=(p.assumed?"":seg("scheme",p.scheme+"://")||"");
+    if(p.assumed)h=`<span class="dim">http://</span>`.replace("<span",`<span class="${sev.scheme?"s-"+sev.scheme.sev:""}"`);
+    h+=p.user?seg("user",p.user+"@"):"";
+    if(p.ipKind)h+=seg("host",p.host);
+    else h+=(p.sub?seg("sub",p.sub+"."):"")+seg("dom",p.dom)+(p.tld?seg("tld","."+p.tld):"");
+    h+=p.port?seg("port",":"+p.port):"";
+    h+=seg("path",p.path)+seg("query",p.query)+seg("frag",p.frag);
+    if(sev.host&&!p.ipKind&&!sev.dom&&!sev.sub)h=h.replace(/<span>/,`<span class="s-${sev.host.sev}">`);
+  }
+  $("#lens").innerHTML=h;
+  // breakdown
+  const rows=p.special?[["Scheme",p.special+":","Not a web address"]]:[
+    ["Scheme",p.scheme+"://",p.scheme==="https"?"Encrypted transport":p.assumed?"Not provided; assumed http":"Not encrypted"],
+    ["Credentials",p.user||"none","Anything before @ is ignored for routing"],
+    ["Subdomain",p.sub||"none","Controlled by the domain owner; read right to left"],
+    ["Domain",p.ipKind?p.host+" (IP, "+p.ipKind+")":p.dom,"This is the name that decides who owns the page"],
+    ["TLD",p.tld||"n/a","Top-level domain"],
+    ["Port",p.port||"default","80 for http, 443 for https"],
+    ["Path",p.path||"/","Location on the server; cannot change ownership"],
+    ["Query",p.query||"none","Parameters sent to the page"],
+    ["Fragment",p.frag||"none","Handled only by your browser"]];
+  $("#bk").innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td class="v">${esc(r[1])}</td><td class="n">${esc(r[2])}</td></tr>`).join("");
+  // findings
+  $("#fl").innerHTML=F.length?F.map(f=>`<div class="f ${f.sev}"><h3><span>${esc(f.title)}</span><em>${NAME[f.sev]}</em></h3><p>${esc(f.why)}</p></div>`).join(""):`<div class="f low" style="--c:var(--ok);--bg2:var(--okbg)"><h3><span>No red flags found</span></h3><p>None of the checks fired. Still confirm the sender and avoid entering credentials from unexpected links.</p></div>`;
+  const R=recs(F,p,r);$("#rc").innerHTML=R.html;
+  $("#pass").innerHTML=P.length?`<details><summary>${P.length} checks passed</summary><ul>${P.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></details>`:"";
+  report=`URL Lens report\nURL (defanged): ${defang(p.raw)}\nRisk: ${r.s}/100 (${r.l})\n\n`+(F.map(f=>`[${NAME[f.sev]}] ${f.title}\n  ${f.why}`).join("\n")||"No red flags found.")+"\n\nRecommendations:\n"+R.flat.map(x=>"- "+x).join("\n");
+}
+$("#go").onclick=run;
+$("#u").addEventListener("keydown",e=>{if(e.key==="Enter")run()});
+document.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{$("#u").value=b.dataset.s;run()});
+$("#cp").onclick=async e=>{try{await navigator.clipboard.writeText(report);e.target.textContent="Copied"}catch(x){e.target.textContent="Copy failed"}setTimeout(()=>e.target.textContent="Copy report",1500)};
+</script>
+</body>
+</html>
